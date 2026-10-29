@@ -1,19 +1,26 @@
 const express = require("express");
 const router = express.Router();
 
-const adminAuth = require("../middleware/adminAuth");
-const admin = require("../controllers/adminController");
+const {
+  getDashboard,
+  getUsers,
+  updateUserStatus,
+  getSubscriptions,
+  updateSubscription,
+  getReports,
+} = require("../controllers/adminController");
 
+const authMiddleware = require("../middleware/authMiddleware");
+const adminAuth = require("../middleware/adminAuth");
+
+router.use(authMiddleware);
 router.use(adminAuth);
 
-router.get("/dashboard", admin.getDashboard);
-
-router.get("/users", admin.getUsers);
-router.patch("/users/:id/status", admin.updateUserStatus);
-
-router.get("/subscriptions", admin.getSubscriptions);
-router.patch("/subscriptions/:userId", admin.updateSubscription);
-
-router.get("/reports", admin.getReports);
+router.get("/dashboard", getDashboard);
+router.get("/users", getUsers);
+router.patch("/users/:id/status", updateUserStatus);
+router.get("/subscriptions", getSubscriptions);
+router.patch("/subscriptions/:userId", updateSubscription);
+router.get("/reports", getReports);
 
 module.exports = router;

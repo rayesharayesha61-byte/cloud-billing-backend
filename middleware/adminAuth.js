@@ -1,3 +1,4 @@
+
 const jwt = require("jsonwebtoken");
 const db = require("../config/db");
 
@@ -5,13 +6,21 @@ async function adminAuth(req, res, next) {
   try {
     const header = req.headers.authorization || "";
     const token = header.startsWith("Bearer ")
-      ? header.slice(7)
-      : null;
+      ? header.slice(7).trim()
+      : "";
 
     if (!token) {
       return res.status(401).json({
         success: false,
         message: "Authentication token required",
+      });
+    }
+
+    if (!process.env.JWT_SECRET) {
+      console.error("JWT_SECRET is missing");
+      return res.status(500).json({
+        success: false,
+        message: "Server authentication configuration error",
       });
     }
 
@@ -38,6 +47,7 @@ async function adminAuth(req, res, next) {
     }
 
     const user = rows[0];
+    const role = String(user.role || "").toUpperCase();
 
     if (Number(user.is_active) !== 1) {
       return res.status(403).json({
@@ -46,7 +56,7 @@ async function adminAuth(req, res, next) {
       });
     }
 
-    if (String(user.role).toUpperCase() !== "ADMIN") {
+    if (!["ADMIN", "SUPER_ADMIN"].includes(role)) {
       return res.status(403).json({
         success: false,
         message: "Admin access only",
@@ -62,7 +72,8 @@ async function adminAuth(req, res, next) {
   } catch (error) {
     if (
       error.name === "JsonWebTokenError" ||
-      error.name === "TokenExpiredError"
+      error.name === "TokenExpiredError" ||
+      error.name === "NotBeforeError"
     ) {
       return res.status(401).json({
         success: false,
