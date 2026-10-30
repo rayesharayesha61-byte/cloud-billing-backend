@@ -100,7 +100,7 @@ const subscriptionRoutes = require("./routes/subscriptionRoutes");
 const settingsRoutes = require("./routes/settingsRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const businessSettingsRoutes = require("./routes/businessSettings");
-
+const superAdminRoutes = require("./routes/superAdminRoutes");
 const app = express();
 
 // Middleware
@@ -131,6 +131,9 @@ app.use("/api/settings", settingsRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/business-settings", businessSettingsRoutes);
 
+
+// Existing admin route-க்கு கீழே
+app.use("/api/super-admin", superAdminRoutes);
 // Server
 const PORT = process.env.PORT || 5000;
 
