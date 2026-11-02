@@ -18,15 +18,22 @@
 // );
 
 // module.exports = router;
+
+const express = require("express");
+const router = express.Router();
+
+const authController = require("../controllers/authController");
+
+// Register
 router.post("/register", authController.register);
+
+// Login
 router.post("/login", authController.login);
 
-router.post(
-  "/forgot-password",
-  authController.getSecurityQuestion
-);
+// Forgot Password - Get Security Question
+router.post("/forgot-password", authController.getSecurityQuestion);
 
-router.post(
-  "/reset-password",
-  authController.resetPassword
-);
+// Reset Password
+router.post("/reset-password", authController.resetPassword);
+
+module.exports = router;
