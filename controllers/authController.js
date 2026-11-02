@@ -450,6 +450,7 @@ const register = async (req, res) => {
       resetAnswer,
     } = req.body;
 
+    // Required validation
     if (
       !name ||
       !email ||
@@ -458,6 +459,7 @@ const register = async (req, res) => {
       !resetAnswer
     ) {
       return res.status(400).json({
+        success: false,
         message: "All fields are required.",
       });
     }
@@ -467,26 +469,55 @@ const register = async (req, res) => {
       typeof email !== "string" ||
       typeof password !== "string" ||
       typeof resetQuestion !== "string" ||
-      typeof resetAnswer !== "string" ||
-      password.length < 6 ||
-      !resetQuestion.trim() ||
-      !resetAnswer.trim()
+      typeof resetAnswer !== "string"
     ) {
       return res.status(400).json({
-        message: "Enter valid details. Password must be at least 6 characters.",
-      });
-    }
-
-    if (!JWT_SECRET) {
-      return res.status(500).json({
-        message: "Server configuration error.",
+        success: false,
+        message: "Invalid input.",
       });
     }
 
     const cleanName = name.trim();
     const cleanEmail = email.trim().toLowerCase();
+    const cleanQuestion = resetQuestion.trim();
     const cleanAnswer = resetAnswer.trim().toLowerCase();
 
+    if (
+      !cleanName ||
+      !cleanEmail ||
+      !cleanQuestion ||
+      !cleanAnswer
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "All fields are required.",
+      });
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(cleanEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a valid email address.",
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters.",
+      });
+    }
+
+    if (!JWT_SECRET) {
+      return res.status(500).json({
+        success: false,
+        message: "Server configuration error.",
+      });
+    }
+
+    // Check existing email
     const [existingUsers] = await db.query(
       "SELECT id FROM users WHERE email = ? LIMIT 1",
       [cleanEmail]
@@ -494,15 +525,16 @@ const register = async (req, res) => {
 
     if (existingUsers.length > 0) {
       return res.status(409).json({
+        success: false,
         message: "An account with this email already exists.",
       });
     }
 
+    // Hash password and security answer
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Hash security answer
     const hashedAnswer = await bcrypt.hash(cleanAnswer, 10);
 
+    // Create user
     const [result] = await db.query(
       `INSERT INTO users
       (
@@ -518,14 +550,20 @@ const register = async (req, res) => {
         role,
         is_active
       )
-      VALUES (?, ?, ?, ?, ?, CURDATE(),
+      VALUES (
+        ?, ?, ?, ?, ?,
+        CURDATE(),
         DATE_ADD(CURDATE(), INTERVAL 30 DAY),
-        'TRIAL', 'FREE_TRIAL', 'USER', 1)`,
+        'TRIAL',
+        'FREE_TRIAL',
+        'USER',
+        1
+      )`,
       [
         cleanName,
         cleanEmail,
         hashedPassword,
-        resetQuestion.trim(),
+        cleanQuestion,
         hashedAnswer,
       ]
     );
@@ -543,6 +581,7 @@ const register = async (req, res) => {
     );
 
     return res.status(201).json({
+      success: true,
       message: "Registration successful.",
       token,
       user: {
@@ -555,16 +594,19 @@ const register = async (req, res) => {
       },
       trialDays: 30,
     });
+
   } catch (error) {
     console.error("REGISTER ERROR:", error);
 
     if (error.code === "ER_DUP_ENTRY") {
       return res.status(409).json({
+        success: false,
         message: "An account with this email already exists.",
       });
     }
 
     return res.status(500).json({
+      success: false,
       message: "Registration failed. Please try again.",
     });
   }
@@ -585,6 +627,7 @@ const login = async (req, res) => {
       !password
     ) {
       return res.status(400).json({
+        success: false,
         message: "Email and password are required.",
       });
     }
@@ -593,6 +636,7 @@ const login = async (req, res) => {
       console.error("JWT_SECRET is missing.");
 
       return res.status(500).json({
+        success: false,
         message: "Server configuration error.",
       });
     }
@@ -621,6 +665,7 @@ const login = async (req, res) => {
 
     if (users.length === 0) {
       return res.status(401).json({
+        success: false,
         message: "Invalid email or password.",
       });
     }
@@ -634,12 +679,14 @@ const login = async (req, res) => {
 
     if (!passwordMatch) {
       return res.status(401).json({
+        success: false,
         message: "Invalid email or password.",
       });
     }
 
     if (Number(user.is_active) !== 1) {
       return res.status(403).json({
+        success: false,
         message: "Your account is deactivated.",
       });
     }
@@ -664,7 +711,9 @@ const login = async (req, res) => {
           [user.id]
         );
       }
+
     } else {
+
       // NORMAL USER: TRIAL / SUBSCRIPTION VALIDATION
 
       const today = new Date();
@@ -689,7 +738,9 @@ const login = async (req, res) => {
             [user.id]
           );
         }
+
       } else {
+
         let subscriptionEndDate = null;
 
         if (user.subscription_end_date) {
@@ -706,6 +757,7 @@ const login = async (req, res) => {
         ) {
           accessAllowed = true;
           currentStatus = "ACTIVE";
+
         } else {
           accessAllowed = false;
           currentStatus = "EXPIRED";
@@ -722,6 +774,7 @@ const login = async (req, res) => {
 
     if (!accessAllowed) {
       return res.status(403).json({
+        success: false,
         message:
           "Your free trial has expired. Please subscribe to continue.",
         status: "TRIAL_EXPIRED",
@@ -729,7 +782,7 @@ const login = async (req, res) => {
       });
     }
 
-    // CREATE JWT WITH DATABASE ROLE
+    // CREATE JWT
 
     const token = jwt.sign(
       {
@@ -743,6 +796,7 @@ const login = async (req, res) => {
     );
 
     return res.status(200).json({
+      success: true,
       message: "Login successful.",
       token,
       user: {
@@ -759,10 +813,12 @@ const login = async (req, res) => {
         business: null,
       },
     });
+
   } catch (error) {
     console.error("LOGIN ERROR:", error);
 
     return res.status(500).json({
+      success: false,
       message: "Login failed. Please try again.",
     });
   }
@@ -776,8 +832,12 @@ const getSecurityQuestion = async (req, res) => {
   try {
     const { email } = req.body;
 
-    if (!email || typeof email !== "string") {
+    if (
+      typeof email !== "string" ||
+      !email.trim()
+    ) {
       return res.status(400).json({
+        success: false,
         message: "Email is required.",
       });
     }
@@ -792,8 +852,12 @@ const getSecurityQuestion = async (req, res) => {
       [cleanEmail]
     );
 
-    if (!users.length || !users[0].reset_question) {
+    if (
+      !users.length ||
+      !users[0].reset_question
+    ) {
       return res.status(404).json({
+        success: false,
         message: "Account or security question not found.",
       });
     }
@@ -802,10 +866,12 @@ const getSecurityQuestion = async (req, res) => {
       success: true,
       question: users[0].reset_question,
     });
+
   } catch (error) {
     console.error("SECURITY QUESTION ERROR:", error);
 
     return res.status(500).json({
+      success: false,
       message: "Unable to get security question.",
     });
   }
@@ -825,35 +891,31 @@ const resetPassword = async (req, res) => {
     } = req.body;
 
     if (
-      !email ||
-      !answer ||
+      typeof email !== "string" ||
+      typeof answer !== "string" ||
+      typeof newPassword !== "string" ||
+      typeof confirmPassword !== "string" ||
+      !email.trim() ||
+      !answer.trim() ||
       !newPassword ||
       !confirmPassword
     ) {
       return res.status(400).json({
+        success: false,
         message: "All fields are required.",
-      });
-    }
-
-    if (
-      typeof email !== "string" ||
-      typeof answer !== "string" ||
-      typeof newPassword !== "string" ||
-      typeof confirmPassword !== "string"
-    ) {
-      return res.status(400).json({
-        message: "Invalid input.",
       });
     }
 
     if (newPassword !== confirmPassword) {
       return res.status(400).json({
+        success: false,
         message: "Passwords do not match.",
       });
     }
 
     if (newPassword.length < 8) {
       return res.status(400).json({
+        success: false,
         message: "Password must contain at least 8 characters.",
       });
     }
@@ -869,11 +931,17 @@ const resetPassword = async (req, res) => {
       [cleanEmail]
     );
 
-    if (!users.length || !users[0].reset_answer) {
+    if (
+      !users.length ||
+      !users[0].reset_answer
+    ) {
       return res.status(400).json({
+        success: false,
         message: "Invalid account or security answer.",
       });
     }
+
+    // Verify security answer
 
     const validAnswer = await bcrypt.compare(
       cleanAnswer,
@@ -882,9 +950,12 @@ const resetPassword = async (req, res) => {
 
     if (!validAnswer) {
       return res.status(400).json({
+        success: false,
         message: "Incorrect security answer.",
       });
     }
+
+    // Hash new password
 
     const hashedPassword = await bcrypt.hash(
       newPassword,
@@ -898,12 +969,14 @@ const resetPassword = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Password reset successfully.",
+      message: "Password reset successfully. Please login again.",
     });
+
   } catch (error) {
     console.error("RESET PASSWORD ERROR:", error);
 
     return res.status(500).json({
+      success: false,
       message: "Password reset failed.",
     });
   }
