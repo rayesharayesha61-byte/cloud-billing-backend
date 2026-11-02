@@ -1,60 +1,36 @@
-
 const express = require("express");
 const router = express.Router();
 
-const admin = require("../middleware/superAdminAuth");
+const auth = require("../middleware/superAdminAuth");
 const controller = require("../controllers/superAdminController");
 
-router.use(admin);
+router.use(auth);
 
-// Dashboard
 router.get("/dashboard", controller.getDashboard);
 
-// Users
 router.get("/users", controller.getUsers);
 router.patch("/users/:id/status", controller.updateUserStatus);
 
-// Businesses
 router.get("/businesses", controller.getBusinesses);
 
-// Subscriptions
 router.get("/subscriptions", controller.getSubscriptions);
 router.patch("/subscriptions/:userId", controller.updateSubscription);
 
-// Plans
-router.get("/plans", controller.getPlans);
-router.post("/plans", controller.createPlan);
-router.put("/plans/:id", controller.updatePlan);
-
-// Payments
 router.get("/payments", controller.getPayments);
 router.patch("/payments/:id/status", controller.updatePaymentStatus);
 
-// Trials
+router.get("/plans", controller.getPlans);
+
 router.get("/trials", controller.getTrials);
-router.patch("/trials/:id", controller.updateTrial);
+router.patch("/trials/:id", controller.extendTrial);
 
-// Coupons (not available in current database)
-router.get("/coupons", controller.getCoupons);
-router.post("/coupons", controller.createCoupon);
-router.patch("/coupons/:id", controller.updateCoupon);
-
-// Notifications (not available in current database)
-router.get("/notifications", controller.getNotifications);
-router.post("/notifications", controller.createNotification);
-
-// Support tickets (not available in current database)
-router.get("/tickets", controller.getTickets);
-router.patch("/tickets/:id", controller.updateTicket);
-
-// Reports
 router.get("/reports", controller.getReports);
 
-// Login activity (not available in current database)
-router.get("/login-activity", controller.getLoginActivity);
-
-// System settings (not available in current database)
-router.get("/settings", controller.getSettings);
-router.put("/settings", controller.updateSettings);
+// Not configured until the required database tables are created
+router.get("/coupons", controller.notImplemented);
+router.get("/notifications", controller.notImplemented);
+router.get("/tickets", controller.notImplemented);
+router.get("/login-activity", controller.notImplemented);
+router.get("/settings", controller.notImplemented);
 
 module.exports = router;

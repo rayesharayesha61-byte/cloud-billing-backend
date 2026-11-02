@@ -1,11 +1,8 @@
-
 const jwt = require("jsonwebtoken");
 const db = require("../config/db");
-require("dotenv").config();
 
 const superAdminAuth = async (req, res, next) => {
   try {
-    // 1. Check Authorization Header
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -15,109 +12,53 @@ const superAdminAuth = async (req, res, next) => {
       });
     }
 
-    // 2. Check JWT Secret
-    const JWT_SECRET = process.env.JWT_SECRET;
-
-    if (!JWT_SECRET) {
-      console.error("JWT_SECRET is missing");
-
-      return res.status(500).json({
-        success: false,
-        message: "Server JWT configuration missing",
-      });
-    }
-
-    // 3. Get Token
     const token = authHeader.split(" ")[1];
 
-    if (!token) {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const adminId = decoded.id || decoded.userId || decoded.user_id;
+
+    if (!adminId) {
       return res.status(401).json({
         success: false,
-        message: "Token missing",
+        message: "Invalid token",
       });
     }
 
-    // 4. Verify Token
-    let decoded;
-
-    try {
-      decoded = jwt.verify(token, JWT_SECRET);
-    } catch (jwtError) {
-      console.error("JWT Verification Error:", jwtError.name);
-
-      return res.status(401).json({
-        success: false,
-        message:
-          jwtError.name === "TokenExpiredError"
-            ? "Token expired. Please login again."
-            : "Invalid authentication token",
-      });
-    }
-
-    // 5. Get User ID
-    const userId =
-      decoded.id ||
-      decoded.userId ||
-      decoded.user_id;
-
-    if (!userId) {
-      return res.status(401).json({
-        success: false,
-        message: "User ID missing in token",
-      });
-    }
-
-    // 6. Check User in Database
-    const [users] = await db.query(
-      `SELECT id, role, is_active
+    const [rows] = await db.execute(
+      `SELECT id, name, email, role, is_active
        FROM users
        WHERE id = ?
        LIMIT 1`,
-      [userId]
+      [adminId]
     );
 
-    if (!users.length) {
-      return res.status(404).json({
+    if (!rows.length) {
+      return res.status(401).json({
         success: false,
-        message: "User not found",
+        message: "Admin not found",
       });
     }
 
-    const user = users[0];
+    const admin = rows[0];
 
-    // 7. Check Super Admin Role
     if (
-      String(user.role || "").trim().toUpperCase() !==
-      "SUPER_ADMIN"
+      String(admin.role).toUpperCase() !== "SUPER_ADMIN" ||
+      ![1, true, "1"].includes(admin.is_active)
     ) {
       return res.status(403).json({
         success: false,
-        message: "Super Admin access only",
+        message: "Super admin access denied",
       });
     }
 
-    // 8. Check Active Status
-    if (Number(user.is_active) !== 1) {
-      return res.status(403).json({
-        success: false,
-        message: "Account is inactive",
-      });
-    }
-
-    // 9. Allow Access
-    req.admin = user;
-
-    return next();
-
+    req.admin = admin;
+    next();
   } catch (error) {
-    console.error(
-      "Super Admin Middleware Error:",
-      error.message
-    );
+    console.error("Super admin authentication error:", error);
 
-    return res.status(500).json({
+    return res.status(401).json({
       success: false,
-      message: "Internal authentication error",
+      message: "Invalid or expired token",
     });
   }
 };
