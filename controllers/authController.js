@@ -435,7 +435,57 @@ const jwt = require("jsonwebtoken");
 
 const db = require("../config/db");
 const { JWT_SECRET } = require("../config/env");
+// =====================================================
+// SAVE LOGIN ACTIVITY
+// =====================================================
 
+const saveLoginActivity = async (
+  req,
+  {
+    user = null,
+    email,
+    status,
+    failureReason = null,
+  }
+) => {
+  try {
+    const forwardedFor = req.headers["x-forwarded-for"];
+
+    const ipAddress = forwardedFor
+      ? String(forwardedFor).split(",")[0].trim()
+      : req.ip || null;
+
+    const deviceInfo = req.headers["user-agent"] || null;
+
+    await db.query(
+      `INSERT INTO login_activity
+      (
+        user_id,
+        business_id,
+        email,
+        role,
+        login_status,
+        ip_address,
+        device_info,
+        failure_reason
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        user?.id || null,
+        user?.business_id || null,
+        email,
+        user?.role || null,
+        status,
+        ipAddress,
+        deviceInfo,
+        failureReason,
+      ]
+    );
+  } catch (error) {
+    // Activity logging failure should not block login.
+    console.error("LOGIN ACTIVITY SAVE ERROR:", error.message);
+  }
+};
 // =====================================================
 // REGISTER
 // =====================================================
