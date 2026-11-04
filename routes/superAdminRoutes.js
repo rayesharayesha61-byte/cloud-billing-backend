@@ -40,7 +40,9 @@ const router = express.Router();
 
 const auth = require("../middleware/superAdminAuth");
 const controller = require("../controllers/superAdminController");
-
+const settingsController = require(
+  "../controllers/superAdminSettingsController"
+);
 router.use(auth);
 
 router.get("/dashboard", controller.getDashboard);
@@ -72,4 +74,8 @@ router.get("/login-activity", controller.getLoginActivity);
 
 router.get("/settings", controller.notImplemented);
 
+
+// Existing superAdmin authentication middleware
+router.get("/settings", settingsController.getSettings);
+router.put("/settings", settingsController.updateSettings);
 module.exports = router;
