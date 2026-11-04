@@ -740,32 +740,53 @@ exports.extendTrial = async (req, res) => {
 };
 
 // Reports
+
+// Revenue Reports
 exports.getReports = async (req, res) => {
   try {
     const reports = await query(`
       SELECT
-        DATE_FORMAT(created_at, '%Y-%m') AS month,
+        MONTH(created_at) AS month_number,
+        MONTHNAME(created_at) AS month,
+        YEAR(created_at) AS year,
+        DATE_FORMAT(created_at, '%Y-%m') AS month_year,
         COALESCE(SUM(amount), 0) AS revenue,
         COUNT(*) AS total_payments
       FROM subscription_payments
       WHERE UPPER(status) = 'APPROVED'
-      GROUP BY DATE_FORMAT(created_at, '%Y-%m')
-      ORDER BY month DESC
-      LIMIT 12
+      GROUP BY
+        YEAR(created_at),
+        MONTH(created_at),
+        MONTHNAME(created_at)
+      ORDER BY
+        YEAR(created_at) ASC,
+        MONTH(created_at) ASC
     `);
+
+    const formattedReports = reports.map((item) => ({
+      month: item.month,
+      year: Number(item.year),
+      month_number: Number(item.month_number),
+      month_year: item.month_year,
+      revenue: Number(item.revenue || 0),
+      total_payments: Number(item.total_payments || 0),
+    }));
 
     res.json({
       success: true,
-      reports: reports.reverse(),
+      reports: formattedReports,
+      monthly: formattedReports,
     });
   } catch (error) {
-    console.error("Reports error:", error);
+    console.error("Revenue Reports Error:", error);
+
     res.status(500).json({
       success: false,
       message: "Reports loading failed",
     });
   }
 };
+
 
 // Login Activity
 exports.getLoginActivity = async (req, res) => {
